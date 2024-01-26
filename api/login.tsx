@@ -2,7 +2,7 @@ const { Encriptacao } = require("../uteis/funcs.tsx")
 
 module.exports = (app) => {
 
-  const logar = async (req, res) => {
+  const login = async (req, res) => {
     const id = req.body.id;
     const senha = req.body.senha;
 
@@ -30,10 +30,11 @@ module.exports = (app) => {
           return
         }
 
-        if (usuario[0].senha === senhaEncriptada) res.status(200).send({ usuario: usuario[0] })
+        if (usuario[0].senha === senhaEncriptada)
+          res.status(200).send({ usuario: usuario[0] })
       })
       .catch((e) => res.status(404).send({ resposta: "Ocorreu um erro:" + e }));
   };
 
-  return { logar };
+  return { login: login };
 };

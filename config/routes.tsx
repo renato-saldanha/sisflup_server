@@ -1,7 +1,7 @@
 module.exports = (app) => {
   app
     .route("/login")
-    .post(app.api.login.logar);
+    .post(app.api.login.login);
 
   app
     .route("/setor/getListaSetores")
