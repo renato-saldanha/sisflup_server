@@ -1,10 +1,10 @@
 const { Encriptacao } = require("../uteis/funcs.tsx")
 
 module.exports = (app) => {
-  const persistirUsuario =  (req, res) => {
+  const persistirUsuario = (req, res) => {
     let novoId = -1
     if (req.body.id === -1) {
-       app
+      app
         .db
         .select("id")
         .from("usuarios")
@@ -109,7 +109,13 @@ module.exports = (app) => {
 
       db
         .orderBy("id")
-        .then((listaUsuarios) => res.json(listaUsuarios))
+        .then((listaUsuarios) => {
+          const listaUsuariosSenhaDescriptografada = listaUsuarios
+          for (let index = 0; index < listaUsuariosSenhaDescriptografada.length - 1; index++)
+            listaUsuariosSenhaDescriptografada[index].senha = Encriptacao(String(listaUsuariosSenhaDescriptografada[index].senha), String(listaUsuariosSenhaDescriptografada[index].id))
+
+          res.json(listaUsuariosSenhaDescriptografada)
+        })
         .catch((e) =>
           res.status(400).send({ resposta: `houve um erro ao buscar usuários: ${e.message}` })
         )
