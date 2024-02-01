@@ -7,9 +7,12 @@ module.exports = (app) => {
     let db = app
       .db
       .from("atividades")
-      .select("atividades.id", "atividades.nome_cliente", "atividades.endereco_cliente", "atividades.data_entrega", "atividades.nome_arquiteto",
-        "atividades.responsavel_atual", "setores.nome as setor_atual", "responsavel_vendas", "observacoes", "responsavel_medicao", "responsavel_producao_serra",
-        "responsavel_producao_acabamento", "responsavel_entrega", "responsavel_instalacao", "atividades.id_setor")
+      .select("atividades.id", "atividades.nome_cliente", "atividades.data_entrega", "atividades.nome_arquiteto",
+        "atividades.responsavel_atual", "setores.nome as setor_atual", "atividades.responsavel_vendas", "observacoes", "atividades.responsavel_medicao", "atividades.responsavel_producao_serra",
+        "atividades.responsavel_producao_acabamento", "atividades.responsavel_entrega", "atividades.responsavel_instalacao", "atividades.id_setor", "atividades_endereco.logradouro",
+        "atividades_endereco.numero", "atividades_endereco.complemento", "bairros.cep","bairros.cidade","bairros.uf","bairros.nome_bairro")
+      .innerJoin("atividades_endereco", "atividades_endereco.id_atividade", "=", "atividades.id")
+      .innerJoin("bairros", "bairros.id", "=", "atividades_endereco.id_bairro")
       .innerJoin("setores", "atividades.id_setor", "=", "setores.id")
 
 
@@ -18,18 +21,18 @@ module.exports = (app) => {
         switch (filtro) {
           case "responsavel":
             db
-              .whereLike("responsavel_vendas", `%${descricao}%`)
-              .orWhereLike("responsavel_medicao", `%${descricao}%`)
-              .orWhereLike("responsavel_producao_serra", `%${descricao}%`)
-              .orWhereLike("responsavel_producao_acabamento", `%${descricao}%`)
-              .orWhereLike("responsavel_entrega", `%${descricao}%`)
-              .orWhereLike("responsavel_instalacao", `%${descricao}%`)
+              .whereLike(app.db.raw("Lower(atividades.responsavel_vendas)"), `%${descricao}%`)
+              .orWhereLike(app.db.raw("Lower(atividades.responsavel_medicao)"), `%${descricao}%`)
+              .orWhereLike(app.db.raw("Lower(atividades.responsavel_producao_serra)"), `%${descricao}%`)
+              .orWhereLike(app.db.raw("Lower(atividades.responsavel_producao_acabamento)"), `%${descricao}%`)
+              .orWhereLike(app.db.raw("Lower(atividades.responsavel_entrega)"), `%${descricao}%`)
+              .orWhereLike(app.db.raw("Lower(atividades.responsavel_instalacao)"), `%${descricao}%`)
             break;
           case "data_entrega":
             db.where(descricao, "<=", filtro)
             break;
           default:
-            db.whereLike(filtro, `%${descricao}%`)
+            db.whereLike(app.db.raw(`Lower(${filtro})`), `%${descricao}%`)
         }
       }
     } else {
@@ -37,7 +40,7 @@ module.exports = (app) => {
     }
 
     db
-      .orderBy("id")
+      .orderBy("atividades.id")
       .then((listaAtividades) => res.json(listaAtividades))
       .catch((e) =>
         res.status(400).send({ resposta: `houve um erro ao buscar atividade: ${e.message}` })
@@ -46,6 +49,8 @@ module.exports = (app) => {
 
   const persistirAtividade = async (req, res) => {
     let novoId = -1
+    let idBairro = -1
+
     if (req.body.id === -1) {
       await app
         .db
@@ -65,10 +70,17 @@ module.exports = (app) => {
         });
     }
 
+
     const novaAtividade = req.body.id < 0 ? true : false
     const id = req.body.id > 0 ? req.body.id : novoId
     const nome_cliente = req.body.nome_cliente
-    const endereco_cliente = req.body.endereco_cliente
+    const cep = req.body.cep.replace("-", "")
+    const numero = req.body.numero
+    const logradouro = req.body.logradouro
+    const complemento = req.body.complemento
+    const nome_bairro = req.body.nome_bairro
+    const cidade = req.body.cidade
+    const uf = req.body.uf
     const data_entrega = req.body.data_entrega
     const nome_arquiteto = req.body.nome_arquiteto
     const responsavel_vendas = req.body.responsavel_vendas
@@ -90,8 +102,8 @@ module.exports = (app) => {
       return
     }
 
-    if (!endereco_cliente) {
-      res.status(404).send({ resposta: "Favor informar o endereço do cliente" })
+    if (!logradouro) {
+      res.status(404).send({ resposta: "Favor informar o logradouro do cliente" })
       return
     }
 
@@ -100,12 +112,59 @@ module.exports = (app) => {
       return
     }
 
+    let idBairroEncontrado = -1
+    await app
+      .db
+      .from("bairros")
+      .select("bairros.id")
+      // .innerJoin("atividades_endereco", "atividades_endereco.id_bairro", "=", "bairros.id")
+      .whereLike("bairros.cep", `%${cep}%`)
+      .then(bairro => {
+        if (bairro && bairro.length > 0) {
+          idBairroEncontrado = bairro[0].id
+        }
+
+      })
+      .catch(e => {
+        res.status(404).send({ resposta: e.message })
+      })
+
+    if (idBairroEncontrado <= 0) {
+      await app
+        .db
+        .from("bairros")
+        .select("bairros.id")
+        .orderBy("bairros.id", "desc")
+        .limit(1)
+        .then((bairro) => {
+          if (bairro.length > 0)
+            idBairro = bairro[0].id + 1
+          else
+            idBairro = 1
+        })
+
+      await app
+        .db
+        .into("bairros")
+        .insert({
+          id: idBairro,
+          nome_bairro: nome_bairro,
+          cidade: cidade,
+          uf: uf,
+          cep: cep
+        })
+        .then(r => {
+          return
+        })
+    } else
+      idBairro = idBairroEncontrado
+
+    let idNovaAtividade = -1
     novaAtividade
-      ? app
+      ? idNovaAtividade = await app
         .db
         .insert({
           nome_cliente: nome_cliente,
-          endereco_cliente: endereco_cliente,
           nome_arquiteto: nome_arquiteto,
           data_entrega: data_entrega,
           responsavel_vendas: responsavel_vendas,
@@ -113,21 +172,18 @@ module.exports = (app) => {
           id_setor: 1
         })
         .into("atividades")
-        .then(r => {
-          if (r) {
-            res.status(200).send("Atividade salva!")
-            return
-          }
-        })
+        .returning("id")
+        // .then(r => {
+
+        // })
         .catch(e => {
           res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
           return
         })
-      : app
+      : await app
         .db
         .update({
           nome_cliente: nome_cliente,
-          endereco_cliente: endereco_cliente,
           nome_arquiteto: nome_arquiteto,
           data_entrega: data_entrega,
           responsavel_vendas: responsavel_vendas,
@@ -150,6 +206,21 @@ module.exports = (app) => {
           res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
           return
         })
+
+    await app
+      .db
+      .into("atividades_endereco")
+      .insert({
+        id_bairro: idBairro,
+        logradouro: logradouro,
+        numero: numero,
+        id_atividade: idNovaAtividade[0].id,
+        complemento: complemento
+      })
+      .then(r => {
+        if (r)
+          res.status(200).send("Atividade salva!")
+      })
   }
 
   const complementarAtividade = async (req, res) => {
@@ -161,6 +232,11 @@ module.exports = (app) => {
     const responsavel_entrega = req.body.responsavel_entrega
     const responsavel_instalacao = req.body.responsavel_instalacao
     const responsavel_atual = req.body.responsavel_atual
+
+    if (!responsavel_atual) {
+      res.status(404).send({ resposta: "Favor informar o responsável" })
+      return
+    }
 
     await app
       .db

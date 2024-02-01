@@ -2,7 +2,7 @@ const app = require('express')()
 const db = require('./config/db.tsx')
 const consign = require('consign')
 
-const host = "192.168.2.75"
+const host = "192.168.100.3"
 const port = 4000
 
 consign()

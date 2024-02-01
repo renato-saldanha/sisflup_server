@@ -51,4 +51,8 @@ module.exports = (app) => {
   app
     .route("/atividade/deletarAtividade/:id")
     .delete(app.api.atividade.deletarAtividade)
+
+  app
+    .route("/bairro/buscarCEP/:cep")
+    .get(app.api.bairro.buscarCEP)
 }

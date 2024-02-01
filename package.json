@@ -14,7 +14,7 @@
   "author": "Renato Saldanha",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.6.3",
+    "axios": "^1.6.7",
     "body-parser": "^1.20.2",
     "config": "^3.3.10",
     "consign": "^0.1.6",

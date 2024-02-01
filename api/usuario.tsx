@@ -105,15 +105,15 @@ module.exports = (app) => {
         .innerJoin("setores", "usuarios.id_setor", "=", "setores.id")
         .innerJoin("permissoes", "usuarios.id_permissao", "=", "permissoes.id")
 
-      if (descricao !== "") db.whereLike(filtro, `%${descricao}%`)
+      if (descricao !== "") db.whereLike(app.db.raw(`Lower(${filtro})`), `%${descricao}%`)
 
       db
         .orderBy("id")
         .then((listaUsuarios) => {
           const listaUsuariosSenhaDescriptografada = listaUsuarios
-          for (let index = 0; index < listaUsuariosSenhaDescriptografada.length - 1; index++)
+          for (let index = 0; index <= listaUsuariosSenhaDescriptografada.length - 1; index++) {
             listaUsuariosSenhaDescriptografada[index].senha = Encriptacao(String(listaUsuariosSenhaDescriptografada[index].senha), String(listaUsuariosSenhaDescriptografada[index].id))
-
+          }
           res.json(listaUsuariosSenhaDescriptografada)
         })
         .catch((e) =>
@@ -126,9 +126,13 @@ module.exports = (app) => {
         .select("usuarios.id", "usuarios.nome", "usuarios.senha", "usuarios.id_permissao", "usuarios.id_setor")
         .orderBy("id")
         .then((listaUsuarios) => {
-          listaUsuarios.length > 0
-            ? res.json(listaUsuarios)
-            : res.status(404).send({ resposta: "Usuário não encontrado" })
+          if (listaUsuarios.length > 0) {
+            const listaUsuariosSenhaDescriptografada = listaUsuarios
+            for (let index = 0; index <= listaUsuariosSenhaDescriptografada.length - 1; index++)
+              listaUsuariosSenhaDescriptografada[index].senha = Encriptacao(String(listaUsuariosSenhaDescriptografada[index].senha), String(listaUsuariosSenhaDescriptografada[index].id))
+
+            res.json(listaUsuariosSenhaDescriptografada)
+          } else res.status(404).send({ resposta: "Usuário não encontrado" })
         })
         .catch((e) =>
           res.status(400).send({ resposta: `Houve um erro ao buscar usuários: ${e.message}` })
