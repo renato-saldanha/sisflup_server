@@ -1,4 +1,13 @@
 module.exports = (app) => {
+  // Rota de status
+  app.get("/", (req, res) => {
+    res.json({ 
+      status: "OK", 
+      message: "SISFLUP Backend está funcionando",
+      timestamp: new Date().toISOString()
+    })
+  })
+
   app
     .route("/login")
     .post(app.api.login.login);
@@ -55,4 +64,8 @@ module.exports = (app) => {
   app
     .route("/bairro/buscarCEP/:cep")
     .get(app.api.bairro.buscarCEP)
+
+  app
+    .route("/bairro/persistirBairro")
+    .post(app.api.bairro.persistirNovoBairro)
 }

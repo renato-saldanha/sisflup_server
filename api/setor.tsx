@@ -7,7 +7,7 @@ module.exports = (app) => {
       .orderBy("id")
       .where("id", "<>", 0)
       .then(listaSetores => res.json(listaSetores))
-      .catch(e => res.status(400).send({ resposta: "House um problema ao coletar os dados dos setores: " + e.message }))
+      .catch(e => res.status(400).send({ resposta: "Houve um problema ao coletar os dados dos setores: " + e.message }))
   }
 
   return { getListaSetores: getListaSetores }

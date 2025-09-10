@@ -33,10 +33,10 @@ module.exports = (app) => {
         if (usuario[0].senha === senhaEncriptada)
           res.status(200).send({ usuario: usuario[0] })
       })
-      .catch((e) =>{
-      if (e)
-        res.status(404).send({ resposta: "Ocorreu um erro:" + e })
-  });
+      .catch((e) => {
+        console.error("Erro no login:", e)
+        res.status(500).send({ resposta: "Ocorreu um erro interno do servidor" })
+      });
   };
 
   return { login: login };

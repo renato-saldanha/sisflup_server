@@ -6,7 +6,11 @@ module.exports = (app) => {
       .select("id", "nome")
       .orderBy("id")
       .then(listaPermissoes => {
-        if (listaPermissoes && listaPermissoes.length > 0) res.status(200).send(listaPermissoes)
+        if (listaPermissoes && listaPermissoes.length > 0) {
+          res.status(200).send(listaPermissoes)
+        } else {
+          res.status(404).send({ resposta: "Nenhuma permissão encontrada" })
+        }
       })
       .catch(e => res.status(400).send({ resposta: e.message }))
   }

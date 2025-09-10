@@ -1,9 +1,10 @@
 const app = require('express')()
 const db = require('./config/db.tsx')
 const consign = require('consign')
+const config = require('./config/environment.js')
 
-const host = "192.168.100.3"
-const port = 4000
+const host = config.server.host
+const port = config.server.port
 
 consign()
   .then('./config/middlewares.tsx')

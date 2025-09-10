@@ -41,12 +41,48 @@ module.exports = (app) => {
 
   }
 
-  function persistirNovoBairro(bairro) {
-  
+  const persistirNovoBairro = async (req, res) => {
+    const { nome_bairro, cidade, uf, cep } = req.body
+
+    if (!nome_bairro || !cidade || !uf || !cep) {
+      res.status(400).send({ resposta: "Todos os campos são obrigatórios" })
+      return
+    }
+
+    try {
+      // Verificar se o bairro já existe
+      const bairroExistente = await app
+        .db
+        .from("bairros")
+        .where("cep", cep.replace("-", ""))
+        .first()
+
+      if (bairroExistente) {
+        res.status(409).send({ resposta: "Bairro com este CEP já existe" })
+        return
+      }
+
+      // Inserir novo bairro
+      const novoBairro = await app
+        .db
+        .into("bairros")
+        .insert({
+          nome_bairro,
+          cidade,
+          uf,
+          cep: cep.replace("-", "")
+        })
+        .returning("*")
+
+      res.status(201).send({ resposta: "Bairro salvo com sucesso", bairro: novoBairro[0] })
+    } catch (e) {
+      res.status(400).send({ resposta: "Erro ao salvar bairro: " + e.message })
+    }
   }
 
   return {
-    buscarCEP: buscarCEP
+    buscarCEP: buscarCEP,
+    persistirNovoBairro: persistirNovoBairro
   }
 
 }

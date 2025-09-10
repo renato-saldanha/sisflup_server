@@ -1,29 +1,9 @@
 const { Encriptacao } = require("../uteis/funcs.tsx")
 
 module.exports = (app) => {
-  const persistirUsuario = (req, res) => {
-    let novoId = -1
-    if (req.body.id === -1) {
-      app
-        .db
-        .select("id")
-        .from("usuarios")
-        .orderBy("id", "desc")
-        .limit(1)
-        .then((usuario) => {
-          if (usuario)
-            novoId = usuario[0].id + 1
-          else
-            novoId = 1
-        })
-        .catch((e) => {
-          res.status(404).send({ resposta: "Ocorreu um erro:" + e.message })
-          return
-        });
-    }
-
-    const novoUsuario = !req.body.id || req.body.id < 0 ? true : false
-    const id = req.body.id > 0 ? req.body.id : novoId
+  const persistirUsuario = async (req, res) => {
+    const novoUsuario = !req.body.id || req.body.id <= 0
+    const id = req.body.id
     const nome = req.body.nome
     const senha = req.body.senha
     const id_permissao = req.body.id_permissao
@@ -49,48 +29,40 @@ module.exports = (app) => {
       return
     }
 
-    const senhaEncriptada = Encriptacao(String(senha), String(id))
-
-    novoUsuario
-      ? app
-        .db
-        .insert({
-          nome: nome,
-          senha: senhaEncriptada,
-          id_permissao: id_permissao,
-          id_setor: id_setor
-        })
-        .into("usuarios")
-        .then(r => {
-          if (r) {
-            res.status(200).send({ resposta: "Usuário salvo!" })
-            return
-          }
-        })
-        .catch(e => {
-          res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
-          return
-        })
-      : app
-        .db
-        .update({
-          nome: nome,
-          senha: senhaEncriptada,
-          id_permissao: id_permissao,
-          id_setor: id_setor
-        })
-        .from("usuarios")
-        .where({ id: id })
-        .then(r => {
-          if (r) {
-            res.status(200).send({ resposta: "Usuário alterado!" })
-            return
-          }
-        })
-        .catch(e => {
-          res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
-          return
-        })
+    try {
+      if (novoUsuario) {
+        // Inserir novo usuário
+        const senhaEncriptada = Encriptacao(String(senha), "1") // Usar ID temporário para encriptação
+        await app
+          .db
+          .insert({
+            nome: nome,
+            senha: senhaEncriptada,
+            id_permissao: id_permissao,
+            id_setor: id_setor
+          })
+          .into("usuarios")
+        
+        res.status(200).send({ resposta: "Usuário salvo!" })
+      } else {
+        // Atualizar usuário existente
+        const senhaEncriptada = Encriptacao(String(senha), String(id))
+        await app
+          .db
+          .update({
+            nome: nome,
+            senha: senhaEncriptada,
+            id_permissao: id_permissao,
+            id_setor: id_setor
+          })
+          .from("usuarios")
+          .where({ id: id })
+        
+        res.status(200).send({ resposta: "Usuário alterado!" })
+      }
+    } catch (e) {
+      res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
+    }
   }
 
   const getListaUsuarios = async (req, res) => {

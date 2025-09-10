@@ -29,7 +29,7 @@ module.exports = (app) => {
               .orWhereLike(app.db.raw("Lower(atividades.responsavel_instalacao)"), `%${descricao}%`)
             break;
           case "data_entrega":
-            db.where(descricao, "<=", filtro)
+            db.where("atividades.data_entrega", "<=", descricao)
             break;
           default:
             db.whereLike(app.db.raw(`Lower(${filtro})`), `%${descricao}%`)
@@ -48,33 +48,12 @@ module.exports = (app) => {
   }
 
   const persistirAtividade = async (req, res) => {
-    let novoId = -1
     let idBairro = -1
 
-    if (req.body.id === -1) {
-      await app
-        .db
-        .from("atividades")
-        .select("atividades.id")
-        .orderBy("atividades.id", "desc")
-        .limit(1)
-        .then((usuario) => {
-          if (usuario.length > 0)
-            novoId = usuario[0].id + 1
-          else
-            novoId = 1
-        })
-        .catch((e) => {
-          res.status(404).send({ resposta: "Ocorreu um erro:" + e.message })
-          return
-        });
-    }
-
-
-    const novaAtividade = req.body.id < 0 ? true : false
-    const id = req.body.id > 0 ? req.body.id : novoId
+    const novaAtividade = !req.body.id || req.body.id <= 0
+    const id = req.body.id
     const nome_cliente = req.body.nome_cliente
-    const cep = req.body.cep.replace("-", "")
+    const cep = req.body.cep ? req.body.cep.replace("-", "") : ""
     const numero = req.body.numero
     const logradouro = req.body.logradouro
     const complemento = req.body.complemento
@@ -113,114 +92,112 @@ module.exports = (app) => {
     }
 
     let idBairroEncontrado = -1
-    await app
-      .db
-      .from("bairros")
-      .select("bairros.id")
-      // .innerJoin("atividades_endereco", "atividades_endereco.id_bairro", "=", "bairros.id")
-      .whereLike("bairros.cep", `%${cep}%`)
-      .then(bairro => {
-        if (bairro && bairro.length > 0) {
-          idBairroEncontrado = bairro[0].id
-        }
-
-      })
-      .catch(e => {
-        res.status(404).send({ resposta: e.message })
-      })
-
-    if (idBairroEncontrado <= 0) {
-      await app
+    try {
+      const bairroExistente = await app
         .db
         .from("bairros")
-        .select("bairros.id")
-        .orderBy("bairros.id", "desc")
-        .limit(1)
-        .then((bairro) => {
-          if (bairro.length > 0)
-            idBairro = bairro[0].id + 1
-          else
-            idBairro = 1
-        })
+        .select("id")
+        .where("cep", cep)
+        .first()
+      
+      if (bairroExistente) {
+        idBairroEncontrado = bairroExistente.id
+      }
+    } catch (e) {
+      console.error("Erro ao buscar bairro:", e.message)
+    }
 
-      await app
+    if (idBairroEncontrado <= 0) {
+      // Inserir novo bairro
+      const novoBairro = await app
         .db
         .into("bairros")
         .insert({
-          id: idBairro,
           nome_bairro: nome_bairro,
           cidade: cidade,
           uf: uf,
           cep: cep
         })
-        .then(r => {
-          return
-        })
-    } else
-      idBairro = idBairroEncontrado
-
-    let idNovaAtividade = -1
-    novaAtividade
-      ? idNovaAtividade = await app
-        .db
-        .insert({
-          nome_cliente: nome_cliente,
-          nome_arquiteto: nome_arquiteto,
-          data_entrega: data_entrega,
-          responsavel_vendas: responsavel_vendas,
-          observacoes: observacoes,
-          id_setor: 1
-        })
-        .into("atividades")
         .returning("id")
-        // .then(r => {
+      
+      idBairro = novoBairro[0].id
+    } else {
+      idBairro = idBairroEncontrado
+    }
 
-        // })
-        .catch(e => {
-          res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
-          return
-        })
-      : await app
-        .db
-        .update({
-          nome_cliente: nome_cliente,
-          nome_arquiteto: nome_arquiteto,
-          data_entrega: data_entrega,
-          responsavel_vendas: responsavel_vendas,
-          responsavel_medicao: responsavel_medicao,
-          responsavel_producao_serra: responsavel_producao_serra,
-          responsavel_producao_acabamento: responsavel_producao_acabamento,
-          responsavel_entrega: responsavel_entrega,
-          responsavel_instalacao: responsavel_instalacao,
-          observacoes: observacoes,
-        })
-        .from("atividades")
-        .where({ id: id })
-        .then(r => {
-          if (r) {
-            res.status(200).send("Atividade alterada!")
-            return
-          }
-        })
-        .catch(e => {
-          res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
-          return
-        })
+    if (novaAtividade) {
+      // Inserir nova atividade
+      try {
+        const idNovaAtividade = await app
+          .db
+          .insert({
+            nome_cliente: nome_cliente,
+            nome_arquiteto: nome_arquiteto,
+            data_entrega: data_entrega,
+            responsavel_vendas: responsavel_vendas,
+            observacoes: observacoes,
+            id_setor: 1
+          })
+          .into("atividades")
+          .returning("id")
 
-    await app
-      .db
-      .into("atividades_endereco")
-      .insert({
-        id_bairro: idBairro,
-        logradouro: logradouro,
-        numero: numero,
-        id_atividade: idNovaAtividade[0].id,
-        complemento: complemento
-      })
-      .then(r => {
-        if (r)
-          res.status(200).send("Atividade salva!")
-      })
+        // Inserir endereço da atividade
+        await app
+          .db
+          .into("atividades_endereco")
+          .insert({
+            id_bairro: idBairro,
+            logradouro: logradouro,
+            numero: numero,
+            id_atividade: idNovaAtividade[0].id,
+            complemento: complemento
+          })
+
+        res.status(200).send("Atividade salva!")
+        return
+      } catch (e) {
+        res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
+        return
+      }
+    } else {
+      // Atualizar atividade existente
+      try {
+        await app
+          .db
+          .update({
+            nome_cliente: nome_cliente,
+            nome_arquiteto: nome_arquiteto,
+            data_entrega: data_entrega,
+            responsavel_vendas: responsavel_vendas,
+            responsavel_medicao: responsavel_medicao,
+            responsavel_producao_serra: responsavel_producao_serra,
+            responsavel_producao_acabamento: responsavel_producao_acabamento,
+            responsavel_entrega: responsavel_entrega,
+            responsavel_instalacao: responsavel_instalacao,
+            observacoes: observacoes,
+          })
+          .from("atividades")
+          .where({ id: id })
+
+        // Atualizar endereço da atividade
+        await app
+          .db
+          .update({
+            id_bairro: idBairro,
+            logradouro: logradouro,
+            numero: numero,
+            complemento: complemento
+          })
+          .from("atividades_endereco")
+          .where({ id_atividade: id })
+
+        res.status(200).send("Atividade alterada!")
+        return
+      } catch (e) {
+        res.status(400).send({ resposta: "Ocorreu um erro: " + e.message })
+        return
+      }
+    }
   }
 
   const complementarAtividade = async (req, res) => {
